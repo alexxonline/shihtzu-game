@@ -8,6 +8,11 @@ const GROUND_Y = 470;       // Top surface of the ground physics body
 const GROUND_THICKNESS = 60;
 const ROAR_RANGE = 280;     // Birds within this many pixels of the dog get knocked out by a roar
 
+// Levels — each entry is the texture key for that level's background.
+// Birds get faster on higher levels (see spawnBird).
+const LEVEL_BG_KEYS = ['city', 'level2', 'level3', 'level4'];
+const TOTAL_LEVELS = LEVEL_BG_KEYS.length;
+
 // Sprite sheet frame sizes (sheets are laid out as a 6x3 grid)
 const SHIH_W = Math.floor(1590 / 6);   // 265
 const SHIH_H = Math.floor(864 / 3);    // 288
@@ -38,6 +43,7 @@ let wasd;
 let scoreText;
 let livesText;
 let pointsText;
+let levelText;
 let centerText;
 let lastBirdTime = 0;
 let nextBirdDelay = 1500;
@@ -49,8 +55,17 @@ let points = 0;
 let invulnerable = false;
 let isRoaring = false;
 
+// Persisted across scene.restart() so progress carries between levels.
+// Reset to defaults only on a fresh campaign (after game over / final win).
+let currentLevel = 1;
+let carryLives = 3;
+let carryPoints = 0;
+
 function preload() {
     this.load.image('city', 'assets/background_city.png');
+    this.load.image('level2', 'assets/background_level2.png');
+    this.load.image('level3', 'assets/background_level3.png');
+    this.load.image('level4', 'assets/background_level4.png');
     this.load.image('shihtzu_sheet', 'assets/sprites_shihtzu.png');
     this.load.image('bird_sheet', 'assets/sprites_enemybird.png');
     this.load.image('pedigree_bag', 'assets/pedigree_bag.png');
@@ -62,9 +77,10 @@ function addFrame(scene, key, name, col, row, w, h) {
 }
 
 function create() {
-    // Reset state on restart
-    lives = 3;
-    points = 0;
+    // Reset state on restart. Lives/points carry across level transitions
+    // via carryLives/carryPoints; currentLevel persists too.
+    lives = carryLives;
+    points = carryPoints;
     invulnerable = false;
     isRoaring = false;
     gameState = 'playing';
@@ -98,9 +114,12 @@ function create() {
     addFrame(this, 'bird_sheet', 'b_hurt_1', 0, 2, BIRD_W, BIRD_H);
 
     // -------- Background (tiled across the world) --------
-    // Source bg is 2172x724. We scale to view height (540) and tile horizontally.
-    const bgScale = VIEW_H / 724;
-    this.add.tileSprite(0, 0, WORLD_W, VIEW_H, 'city')
+    // Each level uses its own art; backgrounds are different sizes, so derive
+    // the scale from the actual texture height to fit the view.
+    const bgKey = LEVEL_BG_KEYS[currentLevel - 1];
+    const bgSource = this.textures.get(bgKey).getSourceImage();
+    const bgScale = VIEW_H / bgSource.height;
+    this.add.tileSprite(0, 0, WORLD_W, VIEW_H, bgKey)
         .setOrigin(0, 0)
         .setTileScale(bgScale, bgScale);
 
@@ -189,8 +208,10 @@ function create() {
         strokeThickness: 4
     };
     scoreText  = this.add.text(16, 14, 'Distance: 0 m', hudStyle).setScrollFactor(0).setDepth(100);
-    livesText  = this.add.text(16, 42, 'Lives: 3',      hudStyle).setScrollFactor(0).setDepth(100);
-    pointsText = this.add.text(16, 70, 'Score: 0',      hudStyle).setScrollFactor(0).setDepth(100);
+    livesText  = this.add.text(16, 42, 'Lives: ' + lives, hudStyle).setScrollFactor(0).setDepth(100);
+    pointsText = this.add.text(16, 70, 'Score: ' + points, hudStyle).setScrollFactor(0).setDepth(100);
+    levelText  = this.add.text(VIEW_W - 16, 14, 'Level ' + currentLevel + '/' + TOTAL_LEVELS, hudStyle)
+        .setOrigin(1, 0).setScrollFactor(0).setDepth(100);
 
     centerText = this.add.text(VIEW_W / 2, VIEW_H / 2, '', {
         font: 'bold 56px Segoe UI, Arial',
@@ -211,7 +232,11 @@ function create() {
     this.input.keyboard.on('keydown-R', () => {
         if (gameState === 'playing') {
             roar.call(this);
-        } else {
+        } else if (gameState === 'gameover' || gameState === 'won') {
+            // Fresh campaign from level 1
+            currentLevel = 1;
+            carryLives = 3;
+            carryPoints = 0;
             this.scene.restart();
         }
     });
@@ -307,9 +332,19 @@ function update(time) {
 
     // ---- Win condition ----
     if (player.x >= WORLD_W - 110) {
-        gameState = 'won';
         player.setVelocityX(0);
-        centerText.setText('YOU MADE IT!\nPress R to play again');
+        if (currentLevel >= TOTAL_LEVELS) {
+            gameState = 'won';
+            centerText.setText('CAMPAIGN COMPLETE!\nPress R to play again');
+        } else {
+            // Level cleared — carry stats forward and advance.
+            gameState = 'levelcomplete';
+            centerText.setText('LEVEL ' + currentLevel + ' COMPLETE!');
+            carryLives = lives;
+            carryPoints = points;
+            currentLevel += 1;
+            this.time.delayedCall(1600, () => this.scene.restart());
+        }
     }
 }
 
@@ -323,7 +358,9 @@ function spawnBird() {
     bird.body.setSize(150, 220);
     bird.body.setOffset((BIRD_W - 150) / 2, (BIRD_H - 220) / 2);
 
-    const speed = Phaser.Math.Between(170, 280);
+    // Each level past the first adds a flat speed bonus to both ends of the range.
+    const levelBonus = (currentLevel - 1) * 55;
+    const speed = Phaser.Math.Between(170 + levelBonus, 280 + levelBonus);
     bird.setVelocityX(-speed);
     // Birds fly left toward the player; flip the sprite so they face left.
     bird.setFlipX(false);
