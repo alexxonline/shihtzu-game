@@ -6,6 +6,7 @@ const VIEW_H = 540;
 const WORLD_W = 5400;
 const GROUND_Y = 470;       // Top surface of the ground physics body
 const GROUND_THICKNESS = 60;
+const ROAR_RANGE = 280;     // Birds within this many pixels of the dog get knocked out by a roar
 
 // Sprite sheet frame sizes (sheets are laid out as a 6x3 grid)
 const SHIH_W = Math.floor(1590 / 6);   // 265
@@ -46,6 +47,7 @@ let gameState = 'playing';
 let lives = 3;
 let points = 0;
 let invulnerable = false;
+let isRoaring = false;
 
 function preload() {
     this.load.image('city', 'assets/background_city.png');
@@ -64,6 +66,7 @@ function create() {
     lives = 3;
     points = 0;
     invulnerable = false;
+    isRoaring = false;
     gameState = 'playing';
     lastBirdTime = 0;
     nextBirdDelay = 1500;
@@ -83,6 +86,7 @@ function create() {
     addFrame(this, 'shihtzu_sheet', 'fall_1', 2, 1, SHIH_W, SHIH_H);
     addFrame(this, 'shihtzu_sheet', 'fall_2', 3, 1, SHIH_W, SHIH_H);
     addFrame(this, 'shihtzu_sheet', 'hurt_1', 3, 2, SHIH_W, SHIH_H);
+    addFrame(this, 'shihtzu_sheet', 'roar_1', 0, 2, SHIH_W, SHIH_H);
 
     // Bird sheet rows: 0=idle/walk, 1=jump/fall/attack, 2=hurt
     addFrame(this, 'bird_sheet', 'b_idle_1', 0, 0, BIRD_W, BIRD_H);
@@ -91,6 +95,7 @@ function create() {
     addFrame(this, 'bird_sheet', 'b_fly_2',  3, 0, BIRD_W, BIRD_H);
     addFrame(this, 'bird_sheet', 'b_fly_3',  4, 0, BIRD_W, BIRD_H);
     addFrame(this, 'bird_sheet', 'b_fly_4',  5, 0, BIRD_W, BIRD_H);
+    addFrame(this, 'bird_sheet', 'b_hurt_1', 0, 2, BIRD_W, BIRD_H);
 
     // -------- Background (tiled across the world) --------
     // Source bg is 2172x724. We scale to view height (540) and tile horizontally.
@@ -204,7 +209,9 @@ function create() {
     });
 
     this.input.keyboard.on('keydown-R', () => {
-        if (gameState !== 'playing') {
+        if (gameState === 'playing') {
+            roar.call(this);
+        } else {
             this.scene.restart();
         }
     });
@@ -216,45 +223,49 @@ function update(time) {
     const speed = 230;
     const onGround = player.body.blocked.down || player.body.touching.down;
 
-    // ---- Horizontal movement ----
-    const goLeft  = cursors.left.isDown  || wasd.left.isDown;
-    const goRight = cursors.right.isDown || wasd.right.isDown;
-
-    if (goLeft && !goRight) {
-        player.setVelocityX(-speed);
-        player.setFlipX(true);
-    } else if (goRight && !goLeft) {
-        player.setVelocityX(speed);
-        player.setFlipX(false);
-    } else {
+    if (isRoaring) {
         player.setVelocityX(0);
-    }
-
-    // ---- Jumping ----
-    const jumpPressed =
-        Phaser.Input.Keyboard.JustDown(cursors.up) ||
-        Phaser.Input.Keyboard.JustDown(cursors.space) ||
-        Phaser.Input.Keyboard.JustDown(wasd.up);
-
-    if (jumpPressed && onGround) {
-        player.setVelocityY(-620);
-    }
-
-    // ---- Animation state ----
-    if (!onGround) {
-        player.anims.stop();
-        if (player.body.velocity.y < 0) {
-            player.setTexture('shihtzu_sheet', 'jump_1');
-        } else {
-            player.setTexture('shihtzu_sheet', 'fall_1');
-        }
-    } else if (player.body.velocity.x !== 0) {
-        if (player.anims.currentAnim?.key !== 'shihtzu-run' || !player.anims.isPlaying) {
-            player.anims.play('shihtzu-run', true);
-        }
     } else {
-        if (player.anims.currentAnim?.key !== 'shihtzu-idle' || !player.anims.isPlaying) {
-            player.anims.play('shihtzu-idle', true);
+        // ---- Horizontal movement ----
+        const goLeft  = cursors.left.isDown  || wasd.left.isDown;
+        const goRight = cursors.right.isDown || wasd.right.isDown;
+
+        if (goLeft && !goRight) {
+            player.setVelocityX(-speed);
+            player.setFlipX(true);
+        } else if (goRight && !goLeft) {
+            player.setVelocityX(speed);
+            player.setFlipX(false);
+        } else {
+            player.setVelocityX(0);
+        }
+
+        // ---- Jumping ----
+        const jumpPressed =
+            Phaser.Input.Keyboard.JustDown(cursors.up) ||
+            Phaser.Input.Keyboard.JustDown(cursors.space) ||
+            Phaser.Input.Keyboard.JustDown(wasd.up);
+
+        if (jumpPressed && onGround) {
+            player.setVelocityY(-620);
+        }
+
+        // ---- Animation state ----
+        if (!onGround) {
+            player.anims.stop();
+            if (player.body.velocity.y < 0) {
+                player.setTexture('shihtzu_sheet', 'jump_1');
+            } else {
+                player.setTexture('shihtzu_sheet', 'fall_1');
+            }
+        } else if (player.body.velocity.x !== 0) {
+            if (player.anims.currentAnim?.key !== 'shihtzu-run' || !player.anims.isPlaying) {
+                player.anims.play('shihtzu-run', true);
+            }
+        } else {
+            if (player.anims.currentAnim?.key !== 'shihtzu-idle' || !player.anims.isPlaying) {
+                player.anims.play('shihtzu-idle', true);
+            }
         }
     }
 
@@ -342,6 +353,37 @@ function collectBag(playerSprite, bag) {
     bag.destroy();
     points += 1;
     pointsText.setText('Score: ' + points);
+}
+
+function roar() {
+    if (isRoaring) return;
+    isRoaring = true;
+
+    player.setVelocityX(0);
+    player.anims.stop();
+    player.setTexture('shihtzu_sheet', 'roar_1');
+
+    // Knock out only birds within ROAR_RANGE of the dog
+    birds.children.each((b) => {
+        const dist = Phaser.Math.Distance.Between(player.x, player.y, b.x, b.y);
+        if (dist <= ROAR_RANGE) {
+            b.body.enable = false;
+            b.anims.stop();
+            b.setTexture('bird_sheet', 'b_hurt_1');
+            this.tweens.add({
+                targets: b,
+                alpha: 0,
+                y: b.y - 30,
+                angle: 90,
+                duration: 450,
+                onComplete: () => b.destroy()
+            });
+        }
+    });
+
+    this.time.delayedCall(550, () => {
+        isRoaring = false;
+    });
 }
 
 function hitBird(playerSprite, bird) {
