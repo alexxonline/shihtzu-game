@@ -31,21 +31,27 @@ const game = new Phaser.Game(config);
 // ---------- Module-scoped game state ----------
 let player;
 let birds;
+let bags;
 let cursors;
 let wasd;
 let scoreText;
 let livesText;
+let pointsText;
 let centerText;
 let lastBirdTime = 0;
 let nextBirdDelay = 1500;
+let lastBagTime = 0;
+let nextBagDelay = 2500;
 let gameState = 'playing';
 let lives = 3;
+let points = 0;
 let invulnerable = false;
 
 function preload() {
     this.load.image('city', 'assets/background_city.png');
     this.load.image('shihtzu_sheet', 'assets/sprites_shihtzu.png');
     this.load.image('bird_sheet', 'assets/sprites_enemybird.png');
+    this.load.image('pedigree_bag', 'assets/pedigree_bag.png');
 }
 
 // Register a custom frame on a loaded image
@@ -56,10 +62,13 @@ function addFrame(scene, key, name, col, row, w, h) {
 function create() {
     // Reset state on restart
     lives = 3;
+    points = 0;
     invulnerable = false;
     gameState = 'playing';
     lastBirdTime = 0;
     nextBirdDelay = 1500;
+    lastBagTime = 0;
+    nextBagDelay = 2500;
 
     // -------- Register frames from sprite sheets --------
     // Shih tzu sheet rows: 0=idle/walk, 1=jump/fall/sit, 2=bark/hurt
@@ -153,6 +162,10 @@ function create() {
     birds = this.physics.add.group({ allowGravity: false });
     this.physics.add.overlap(player, birds, hitBird, null, this);
 
+    // -------- Pedigree bags (pickups) --------
+    bags = this.physics.add.group({ allowGravity: false });
+    this.physics.add.overlap(player, bags, collectBag, null, this);
+
     // -------- Goal flag at right edge --------
     const flagX = WORLD_W - 80;
     this.add.rectangle(flagX, GROUND_Y - 80, 6, 160, 0x444444).setOrigin(0.5, 0.5);
@@ -170,8 +183,9 @@ function create() {
         stroke: '#000000',
         strokeThickness: 4
     };
-    scoreText = this.add.text(16, 14, 'Distance: 0 m', hudStyle).setScrollFactor(0).setDepth(100);
-    livesText = this.add.text(16, 42, 'Lives: 3',     hudStyle).setScrollFactor(0).setDepth(100);
+    scoreText  = this.add.text(16, 14, 'Distance: 0 m', hudStyle).setScrollFactor(0).setDepth(100);
+    livesText  = this.add.text(16, 42, 'Lives: 3',      hudStyle).setScrollFactor(0).setDepth(100);
+    pointsText = this.add.text(16, 70, 'Score: 0',      hudStyle).setScrollFactor(0).setDepth(100);
 
     centerText = this.add.text(VIEW_W / 2, VIEW_H / 2, '', {
         font: 'bold 56px Segoe UI, Arial',
@@ -262,6 +276,20 @@ function update(time) {
         }
     });
 
+    // ---- Bag spawning ----
+    if (time - lastBagTime > nextBagDelay) {
+        spawnBag.call(this);
+        lastBagTime = time;
+        nextBagDelay = Phaser.Math.Between(1800, 4500);
+    }
+
+    // ---- Cull off-screen bags ----
+    bags.children.each((b) => {
+        if (b.x < player.x - VIEW_W) {
+            b.destroy();
+        }
+    });
+
     // ---- HUD ----
     const meters = Math.max(0, Math.floor((player.x - 120) / 20));
     scoreText.setText('Distance: ' + meters + ' m');
@@ -292,6 +320,28 @@ function spawnBird() {
     bird.setVelocityY(Phaser.Math.Between(-30, 30));
 
     bird.anims.play('bird-fly');
+}
+
+function spawnBag() {
+    const spawnX = player.x + VIEW_W * 0.6 + Phaser.Math.Between(0, 400);
+    if (spawnX > WORLD_W - 150) return;
+
+    const bag = bags.create(spawnX, 0, 'pedigree_bag');
+    bag.body.setAllowGravity(false);
+
+    // Half the shih tzu's rendered height
+    const targetHeight = SHIH_H * player.scale * 0.5;
+    bag.setScale(targetHeight / bag.height);
+
+    // Sit on the ground
+    bag.y = GROUND_Y - bag.displayHeight / 2;
+    bag.body.updateFromGameObject();
+}
+
+function collectBag(playerSprite, bag) {
+    bag.destroy();
+    points += 1;
+    pointsText.setText('Score: ' + points);
 }
 
 function hitBird(playerSprite, bird) {
