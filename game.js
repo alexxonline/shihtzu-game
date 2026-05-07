@@ -10,8 +10,8 @@ const GROUND_THICKNESS = 60;
 // Sprite sheet frame sizes (sheets are laid out as a 6x3 grid)
 const SHIH_W = Math.floor(1590 / 6);   // 265
 const SHIH_H = Math.floor(864 / 3);    // 288
-const BIRD_W = Math.floor(1448 / 6);   // 241
-const BIRD_H = Math.floor(1086 / 3);   // 362
+const BIRD_W = Math.floor(1380 / 6);   // 230
+const BIRD_H = Math.floor(864 / 3);   // 288
 
 const config = {
     type: Phaser.AUTO,
@@ -235,12 +235,12 @@ function update(time) {
             player.setTexture('shihtzu_sheet', 'fall_1');
         }
     } else if (player.body.velocity.x !== 0) {
-        if (player.anims.currentAnim?.key !== 'shihtzu-run') {
-            player.anims.play('shihtzu-run');
+        if (player.anims.currentAnim?.key !== 'shihtzu-run' || !player.anims.isPlaying) {
+            player.anims.play('shihtzu-run', true);
         }
     } else {
-        if (player.anims.currentAnim?.key !== 'shihtzu-idle') {
-            player.anims.play('shihtzu-idle');
+        if (player.anims.currentAnim?.key !== 'shihtzu-idle' || !player.anims.isPlaying) {
+            player.anims.play('shihtzu-idle', true);
         }
     }
 

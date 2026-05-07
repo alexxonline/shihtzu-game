@@ -20,7 +20,7 @@ Then open `http://localhost:8000`. There is no build, no test suite, no linter, 
 
 **Three files, no modules.** `index.html` loads Phaser from jsDelivr and then `game.js`. `game.js` defines one Phaser scene as bare `preload` / `create` / `update` functions and a few module-scoped `let` variables (`player`, `birds`, `cursors`, `lives`, `gameState`, …). State is reset at the top of `create()` so `this.scene.restart()` works cleanly.
 
-**Sprite sheets are sliced by hand, not via `load.spritesheet`.** The two character PNGs are 6×3 grids whose dimensions don't divide evenly (e.g. 1672/6 = 278.67). To avoid the fractional-frame headache, `preload()` loads each sheet as a plain image, and `create()` registers named sub-frames via `textures.get(key).add(name, 0, x, y, w, h)` — see the `addFrame()` helper. `SHIH_W/H` and `BIRD_W/H` are the resulting integer frame sizes (`Math.floor` of the divisions).
+**Sprite sheets are sliced by hand, not via `load.spritesheet`.** The two character PNGs are 6×3 grids whose dimensions divide evenly (e.g. 1672/6 = 278.67). To avoid the fractional-frame headache, `preload()` loads each sheet as a plain image, and `create()` registers named sub-frames via `textures.get(key).add(name, 0, x, y, w, h)` — see the `addFrame()` helper. `SHIH_W/H` and `BIRD_W/H` are the resulting integer frame sizes (`Math.floor` of the divisions).
 
 **Tuning constants live at the top of `game.js`:**
 - `WORLD_W` (5400) — world length; the goal flag sits near the right edge.
