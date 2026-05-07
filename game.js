@@ -37,6 +37,8 @@ const game = new Phaser.Game(config);
 // ---------- Module-scoped game state ----------
 let player;
 let birds;
+let enemyDogs;
+let dogSpawnQueue = [];
 let bags;
 let cursors;
 let wasd;
@@ -68,6 +70,7 @@ function preload() {
     this.load.image('level4', 'assets/background_level4.png');
     this.load.image('shihtzu_sheet', 'assets/sprites_shihtzu.png');
     this.load.image('bird_sheet', 'assets/sprites_enemybird.png');
+    this.load.image('enemydog_sheet', 'assets/sprites_enemydog.png');
     this.load.image('pedigree_bag', 'assets/pedigree_bag.png');
 }
 
@@ -112,6 +115,15 @@ function create() {
     addFrame(this, 'bird_sheet', 'b_fly_3',  4, 0, BIRD_W, BIRD_H);
     addFrame(this, 'bird_sheet', 'b_fly_4',  5, 0, BIRD_W, BIRD_H);
     addFrame(this, 'bird_sheet', 'b_hurt_1', 0, 2, BIRD_W, BIRD_H);
+
+    // Enemy dog sheet — same 6x3 layout / frame size as the bird sheet
+    addFrame(this, 'enemydog_sheet', 'd_idle_1', 0, 0, BIRD_W, BIRD_H);
+    addFrame(this, 'enemydog_sheet', 'd_idle_2', 1, 0, BIRD_W, BIRD_H);
+    addFrame(this, 'enemydog_sheet', 'd_walk_1', 2, 0, BIRD_W, BIRD_H);
+    addFrame(this, 'enemydog_sheet', 'd_walk_2', 3, 0, BIRD_W, BIRD_H);
+    addFrame(this, 'enemydog_sheet', 'd_walk_3', 4, 0, BIRD_W, BIRD_H);
+    addFrame(this, 'enemydog_sheet', 'd_walk_4', 5, 0, BIRD_W, BIRD_H);
+    addFrame(this, 'enemydog_sheet', 'd_hurt_1', 0, 2, BIRD_W, BIRD_H);
 
     // -------- Background (tiled across the world) --------
     // Each level uses its own art; backgrounds are different sizes, so derive
@@ -160,6 +172,17 @@ function create() {
         repeat: -1
     });
     this.anims.create({
+        key: 'enemydog-walk',
+        frames: [
+            { key: 'enemydog_sheet', frame: 'd_walk_1' },
+            { key: 'enemydog_sheet', frame: 'd_walk_2' },
+            { key: 'enemydog_sheet', frame: 'd_walk_3' },
+            { key: 'enemydog_sheet', frame: 'd_walk_4' }
+        ],
+        frameRate: 8,
+        repeat: -1
+    });
+    this.anims.create({
         key: 'bird-fly',
         frames: [
             { key: 'bird_sheet', frame: 'b_fly_1' },
@@ -184,7 +207,27 @@ function create() {
 
     // -------- Birds (enemies) --------
     birds = this.physics.add.group({ allowGravity: false });
-    this.physics.add.overlap(player, birds, hitBird, null, this);
+    this.physics.add.overlap(player, birds, hitEnemy, null, this);
+
+    // -------- Enemy dogs (ground enemies) --------
+    // Walk rightward at the protagonist's level. Immune to roar (the roar
+    // function only iterates the `birds` group). Spawned lazily as the player
+    // approaches each pre-planned x position for the current level.
+    enemyDogs = this.physics.add.group();
+    this.physics.add.collider(enemyDogs, ground);
+    this.physics.add.overlap(player, enemyDogs, hitEnemy, null, this);
+
+    const dogCounts = [3, 5, 7, 9];
+    const dogCount = dogCounts[currentLevel - 1] || 3;
+    dogSpawnQueue = [];
+    const dogStartX = 800;
+    const dogEndX = WORLD_W - 350;
+    const segment = (dogEndX - dogStartX) / dogCount;
+    for (let i = 0; i < dogCount; i++) {
+        const x = dogStartX + i * segment + Phaser.Math.Between(0, Math.floor(segment));
+        dogSpawnQueue.push(Math.min(x, dogEndX));
+    }
+    dogSpawnQueue.sort((a, b) => a - b);
 
     // -------- Pedigree bags (pickups) --------
     bags = this.physics.add.group({ allowGravity: false });
@@ -312,6 +355,18 @@ function update(time) {
         }
     });
 
+    // ---- Enemy dogs: spawn each one as the player approaches its x ----
+    while (dogSpawnQueue.length > 0 && dogSpawnQueue[0] < player.x + VIEW_W * 0.7) {
+        spawnEnemyDog.call(this, dogSpawnQueue.shift());
+    }
+
+    // ---- Cull off-screen dogs (behind player) ----
+    enemyDogs.children.each((d) => {
+        if (d.x < player.x - VIEW_W) {
+            d.destroy();
+        }
+    });
+
     // ---- Bag spawning ----
     if (time - lastBagTime > nextBagDelay) {
         spawnBag.call(this);
@@ -370,6 +425,20 @@ function spawnBird() {
     bird.anims.play('bird-fly');
 }
 
+function spawnEnemyDog(spawnX) {
+    const dog = enemyDogs.create(spawnX, GROUND_Y - 80, 'enemydog_sheet', 'd_walk_1');
+    dog.setScale(0.32);
+    // Match the player's hit box footprint roughly; sprite has transparent margin.
+    dog.body.setSize(150, 200);
+    dog.body.setOffset((BIRD_W - 150) / 2, BIRD_H - 240);
+    // Walks leftward, opposite direction to the protagonist; slower than birds.
+    const levelBonus = (currentLevel - 1) * 12;
+    const speed = Phaser.Math.Between(55 + levelBonus, 95 + levelBonus);
+    dog.setVelocityX(-speed);
+    dog.setFlipX(false);
+    dog.anims.play('enemydog-walk');
+}
+
 function spawnBag() {
     const spawnX = player.x + VIEW_W * 0.6 + Phaser.Math.Between(0, 400);
     if (spawnX > WORLD_W - 150) return;
@@ -423,10 +492,10 @@ function roar() {
     });
 }
 
-function hitBird(playerSprite, bird) {
+function hitEnemy(playerSprite, enemy) {
     if (invulnerable || gameState !== 'playing') return;
 
-    bird.destroy();
+    enemy.destroy();
     lives -= 1;
     livesText.setText('Lives: ' + lives);
 
