@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Shih Tzu City Adventure</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            color: #eee;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        h1 {
+            margin: 12px 0 6px;
+            letter-spacing: 1px;
+        }
+        #game {
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .controls {
+            margin-top: 10px;
+            font-size: 14px;
+            opacity: 0.85;
+            text-align: center;
+        }
+        .controls kbd {
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid #555;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Shih Tzu City Adventure</h1>
+    <div id="game"></div>
+    <div class="controls">
+        Move: <kbd>&larr;</kbd> <kbd>&rarr;</kbd> or <kbd>A</kbd>/<kbd>D</kbd> &nbsp;&middot;&nbsp;
+        Jump: <kbd>&uarr;</kbd>, <kbd>Space</kbd>, or <kbd>W</kbd> &nbsp;&middot;&nbsp;
+        Avoid the birds!
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

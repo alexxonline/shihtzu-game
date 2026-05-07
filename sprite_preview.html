@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sprite Preview Tool</title>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0d1117; color: #c9d1d9;
+  font-family: 'Consolas', 'Courier New', monospace;
+  display: flex; height: 100vh; overflow: hidden; font-size: 13px;
+}
+
+/* ── Sidebar ── */
+#sidebar {
+  width: 290px; flex-shrink: 0;
+  background: #161b22; border-right: 1px solid #30363d;
+  overflow-y: auto; padding: 14px 12px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+h2 { color: #58a6ff; font-size: 15px; font-weight: 700; }
+h3 {
+  color: #8b949e; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 1px; margin-bottom: 6px;
+  border-bottom: 1px solid #21262d; padding-bottom: 4px;
+}
+
+.sprite-tabs { display: flex; gap: 4px; }
+.tab-btn {
+  flex: 1; padding: 7px 4px;
+  background: #21262d; border: 1px solid #30363d;
+  color: #8b949e; cursor: pointer; border-radius: 6px;
+  font-family: inherit; font-size: 13px; font-weight: 600;
+}
+.tab-btn:hover { background: #30363d; color: #c9d1d9; }
+.tab-btn.active { background: #1f6feb; border-color: #388bfd; color: #fff; }
+
+.frame-list { display: flex; flex-direction: column; gap: 3px; max-height: 200px; overflow-y: auto; }
+.frame-btn {
+  padding: 5px 10px; background: #21262d; border: 1px solid #30363d;
+  color: #8b949e; cursor: pointer; border-radius: 4px;
+  font-family: inherit; font-size: 12px; text-align: left;
+}
+.frame-btn:hover { background: #30363d; color: #c9d1d9; }
+.frame-btn.active { background: #0d419d; border-color: #1f6feb; color: #79c0ff; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field label { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+.field input {
+  background: #0d1117; border: 1px solid #30363d; color: #e6edf3;
+  padding: 5px 7px; border-radius: 4px; font-family: inherit; font-size: 13px; width: 100%;
+}
+.field input:focus { outline: none; border-color: #388bfd; box-shadow: 0 0 0 2px rgba(56,139,253,0.15); }
+
+.check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.check-row input[type=checkbox] { accent-color: #1f6feb; width: 14px; height: 14px; cursor: pointer; }
+.check-row label { cursor: pointer; color: #8b949e; font-size: 12px; }
+
+/* ── Animation section ── */
+.anim-row { display: flex; gap: 6px; align-items: center; }
+#anim-select {
+  flex: 1; background: #0d1117; border: 1px solid #30363d; color: #e6edf3;
+  padding: 6px 8px; border-radius: 4px; font-family: inherit; font-size: 12px;
+}
+#anim-select:focus { outline: none; border-color: #388bfd; }
+#anim-btn {
+  padding: 6px 10px; background: #6e40c9; border: 1px solid #8957e5;
+  color: #fff; cursor: pointer; border-radius: 4px;
+  font-family: inherit; font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+#anim-btn:hover { background: #8957e5; }
+#anim-btn.playing { background: #da3633; border-color: #f85149; }
+
+/* ── Bottom buttons ── */
+.btn-row { display: flex; gap: 6px; }
+.action-btn {
+  flex: 1; padding: 8px; border: 1px solid; cursor: pointer;
+  border-radius: 6px; font-family: inherit; font-size: 12px; font-weight: 600;
+}
+.btn-green { background: #238636; border-color: #2ea043; color: #fff; }
+.btn-green:hover { background: #2ea043; }
+.btn-gray  { background: #21262d; border-color: #30363d; color: #8b949e; }
+.btn-gray:hover  { background: #30363d; color: #c9d1d9; }
+
+#code-out {
+  background: #0d1117; border: 1px solid #30363d; border-radius: 4px;
+  padding: 8px; font-size: 11px; color: #7ee787;
+  white-space: pre-wrap; word-break: break-all; display: none;
+  line-height: 1.6; margin-top: 6px;
+}
+
+#frame-info {
+  background: #21262d; border-radius: 4px; padding: 6px 10px;
+  font-size: 11px; color: #8b949e; line-height: 1.8;
+}
+#frame-info span { color: #e6edf3; }
+
+/* ── Main area ── */
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+#phaser-area {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: #0d1117; min-height: 0; position: relative;
+}
+#phaser-area canvas { display: block; }
+#phaser-label {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  background: rgba(13,17,23,0.7); border: 1px solid #30363d; border-radius: 4px;
+  padding: 2px 10px; font-size: 11px; color: #8b949e; pointer-events: none;
+}
+#sheet-area {
+  height: 190px; flex-shrink: 0;
+  background: #161b22; border-top: 1px solid #30363d;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; position: relative;
+}
+#sheet-canvas { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
+#sheet-label {
+  position: absolute; bottom: 4px; right: 8px;
+  font-size: 10px; color: #30363d; pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<!-- ── SIDEBAR ────────────────────────────────────────────────── -->
+<div id="sidebar">
+  <h2>Sprite Preview</h2>
+
+  <div>
+    <h3>Sheet</h3>
+    <div class="sprite-tabs">
+      <button class="tab-btn active" data-sprite="shihtzu" onclick="selectSprite('shihtzu')">Shih Tzu</button>
+      <button class="tab-btn"        data-sprite="bird"    onclick="selectSprite('bird')">Bird</button>
+    </div>
+  </div>
+
+  <div>
+    <h3>Frames</h3>
+    <div class="frame-list" id="frame-list"></div>
+  </div>
+
+  <div id="frame-info">
+    name: <span id="info-name">—</span><br>
+    col: <span id="info-col">—</span> &nbsp; row: <span id="info-row">—</span>
+  </div>
+
+  <div>
+    <h3>Frame Cut (addFrame params)</h3>
+    <div class="grid2">
+      <div class="field"><label>X (pixels)</label><input type="number" id="p-x" step="1" oninput="onParamChange()"></div>
+      <div class="field"><label>Y (pixels)</label><input type="number" id="p-y" step="1" oninput="onParamChange()"></div>
+      <div class="field"><label>Width</label>    <input type="number" id="p-w" step="1" oninput="onParamChange()"></div>
+      <div class="field"><label>Height</label>   <input type="number" id="p-h" step="1" oninput="onParamChange()"></div>
+    </div>
+  </div>
+
+  <div>
+    <h3>Scale</h3>
+    <div class="field"><label>setScale</label><input type="number" id="p-scale" step="0.01" oninput="onParamChange()"></div>
+  </div>
+
+  <div>
+    <h3>Hitbox</h3>
+    <div class="check-row">
+      <input type="checkbox" id="show-hitbox" checked onchange="onParamChange()">
+      <label for="show-hitbox">Show hitbox overlay</label>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>HB Width</label>   <input type="number" id="p-hbw" step="1" oninput="onParamChange()"></div>
+      <div class="field"><label>HB Height</label>  <input type="number" id="p-hbh" step="1" oninput="onParamChange()"></div>
+      <div class="field"><label>HB Offset X</label><input type="number" id="p-hbx" step="1" oninput="onParamChange()"></div>
+      <div class="field"><label>HB Offset Y</label><input type="number" id="p-hby" step="1" oninput="onParamChange()"></div>
+    </div>
+  </div>
+
+  <div>
+    <h3>Animation</h3>
+    <div class="anim-row">
+      <select id="anim-select" onchange="stopAnimation()"></select>
+      <button id="anim-btn" onclick="toggleAnimation()">▶ Play</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="btn-row">
+      <button class="action-btn btn-green" onclick="copyCode()">Copy Code</button>
+      <button class="action-btn btn-gray"  onclick="resetDefaults()">Reset</button>
+    </div>
+    <pre id="code-out"></pre>
+  </div>
+</div>
+
+<!-- ── MAIN ──────────────────────────────────────────────────── -->
+<div id="main">
+  <div id="phaser-area">
+    <div id="game"></div>
+    <div id="phaser-label">preview — green = hitbox &nbsp; blue = frame bounds</div>
+  </div>
+  <div id="sheet-area">
+    <canvas id="sheet-canvas"></canvas>
+    <span id="sheet-label">Sheet Overview</span>
+  </div>
+</div>
+
+<script>
+// ── Constants (mirrored from game.js) ──────────────────────────────────────
+const SHIH_W = Math.floor(1672 / 6);   // 278
+const SHIH_H = Math.floor(941  / 3);   // 313
+const BIRD_W = Math.floor(1448 / 6);   // 241
+const BIRD_H = Math.floor(1086 / 3);   // 362
+
+const FRAME_DEFS = {
+  shihtzu: [
+    { name:'idle_1', col:0, row:0 }, { name:'idle_2', col:1, row:0 },
+    { name:'run_1',  col:2, row:0 }, { name:'run_2',  col:3, row:0 },
+    { name:'run_3',  col:4, row:0 }, { name:'run_4',  col:5, row:0 },
+    { name:'jump_1', col:0, row:1 }, { name:'jump_2', col:1, row:1 },
+    { name:'fall_1', col:2, row:1 }, { name:'fall_2', col:3, row:1 },
+    { name:'hurt_1', col:2, row:2 },
+  ],
+  bird: [
+    { name:'b_idle_1', col:0, row:0 }, { name:'b_idle_2', col:1, row:0 },
+    { name:'b_fly_1',  col:2, row:0 }, { name:'b_fly_2',  col:3, row:0 },
+    { name:'b_fly_3',  col:4, row:0 }, { name:'b_fly_4',  col:5, row:0 },
+  ]
+};
+
+// Frame indices per animation, and their fps
+const ANIM_DEFS = {
+  shihtzu: [
+    { name:'All frames',  indices:[0,1,2,3,4,5,6,7,8,9,10], fps:8  },
+    { name:'Idle (3fps)', indices:[0,1],                     fps:3  },
+    { name:'Run (12fps)', indices:[2,3,4,5],                 fps:12 },
+    { name:'Jump (6fps)', indices:[6,7],                     fps:6  },
+    { name:'Fall (6fps)', indices:[8,9],                     fps:6  },
+  ],
+  bird: [
+    { name:'All frames',   indices:[0,1,2,3,4,5], fps:10 },
+    { name:'Idle (3fps)',  indices:[0,1],          fps:3  },
+    { name:'Fly (10fps)',  indices:[2,3,4,5],      fps:10 },
+  ]
+};
+
+const DEFAULTS = {
+  shihtzu: {
+    scale: 0.32,
+    hbw: 150, hbh: 200,
+    hbx: Math.round((SHIH_W - 150) / 2),
+    hby: SHIH_H - 300,
+  },
+  bird: {
+    scale: 0.22,
+    hbw: 150, hbh: 220,
+    hbx: Math.round((BIRD_W - 150) / 2),
+    hby: Math.round((BIRD_H - 220) / 2),
+  }
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentSprite    = 'shihtzu';
+let currentFrameIdx  = 0;
+let scene            = null;
+let previewImg       = null;
+let hbGfx            = null;
+let frameBorderGfx   = null;
+let animTimer        = null;
+let animFrameCursor  = 0;
+
+// ── Phaser setup ───────────────────────────────────────────────────────────
+const phaserCfg = {
+  type: Phaser.AUTO,
+  parent: 'game',
+  width: 520,
+  height: 400,
+  transparent: true,
+  scene: {
+    preload() {
+      this.load.image('shihtzu_sheet', 'assets/sprites_shihtzu.png');
+      this.load.image('bird_sheet',    'assets/sprites_enemybird.png');
+    },
+    create() {
+      scene = this;
+
+      // Checkerboard background
+      const bg = this.add.graphics();
+      const S = 20;
+      for (let r = 0; r <= 400 / S; r++) {
+        for (let c = 0; c <= 520 / S; c++) {
+          bg.fillStyle((r + c) % 2 === 0 ? 0x1e2530 : 0x242c38, 1);
+          bg.fillRect(c * S, r * S, S, S);
+        }
+      }
+
+      // Center crosshair
+      const ch = this.add.graphics();
+      ch.lineStyle(1, 0x30363d, 0.8);
+      ch.lineBetween(260, 0, 260, 400);
+      ch.lineBetween(0, 200, 520, 200);
+
+      frameBorderGfx = this.add.graphics().setDepth(5);
+      previewImg     = this.add.image(260, 200, 'shihtzu_sheet').setDepth(10);
+      hbGfx          = this.add.graphics().setDepth(20);
+
+      buildFrameList();
+      buildAnimSelect();
+      applyDefaults();
+      selectFrame(0);
+    }
+  }
+};
+
+new Phaser.Game(phaserCfg);
+
+// ── Sprite / frame selection ───────────────────────────────────────────────
+function selectSprite(name) {
+  if (name === currentSprite) return;
+  stopAnimation();
+  currentSprite   = name;
+  currentFrameIdx = 0;
+  document.querySelectorAll('.tab-btn')
+    .forEach(b => b.classList.toggle('active', b.dataset.sprite === name));
+  applyDefaults();
+  buildFrameList();
+  buildAnimSelect();
+  loadSheetImg(name);
+  selectFrame(0);
+}
+
+function applyDefaults() {
+  const d = DEFAULTS[currentSprite];
+  setVal('p-scale', d.scale);
+  setVal('p-hbw',   d.hbw);
+  setVal('p-hbh',   d.hbh);
+  setVal('p-hbx',   d.hbx);
+  setVal('p-hby',   d.hby);
+}
+
+function resetDefaults() {
+  stopAnimation();
+  applyDefaults();
+  selectFrame(currentFrameIdx);
+}
+
+function buildFrameList() {
+  const el = document.getElementById('frame-list');
+  el.innerHTML = '';
+  FRAME_DEFS[currentSprite].forEach((f, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'frame-btn' + (i === currentFrameIdx ? ' active' : '');
+    btn.textContent = `${f.name}  [col:${f.col} row:${f.row}]`;
+    btn.onclick = () => { stopAnimation(); selectFrame(i); };
+    el.appendChild(btn);
+  });
+}
+
+function buildAnimSelect() {
+  const sel = document.getElementById('anim-select');
+  sel.innerHTML = '';
+  ANIM_DEFS[currentSprite].forEach((a, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = a.name;
+    sel.appendChild(opt);
+  });
+}
+
+function selectFrame(idx) {
+  currentFrameIdx = idx;
+  document.querySelectorAll('.frame-btn')
+    .forEach((b, i) => b.classList.toggle('active', i === idx));
+
+  const f = FRAME_DEFS[currentSprite][idx];
+  const fw = currentSprite === 'shihtzu' ? SHIH_W : BIRD_W;
+  const fh = currentSprite === 'shihtzu' ? SHIH_H : BIRD_H;
+  setVal('p-x', f.col * fw);
+  setVal('p-y', f.row * fh);
+  setVal('p-w', fw);
+  setVal('p-h', fh);
+
+  document.getElementById('info-name').textContent = f.name;
+  document.getElementById('info-col').textContent  = f.col;
+  document.getElementById('info-row').textContent  = f.row;
+
+  renderFrame();
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function onParamChange() {
+  stopAnimation();
+  renderFrame();
+}
+
+function renderFrame() {
+  if (!scene || !previewImg) return;
+
+  const sheetKey = currentSprite === 'shihtzu' ? 'shihtzu_sheet' : 'bird_sheet';
+  const fx    = intVal('p-x');
+  const fy    = intVal('p-y');
+  const fw    = intVal('p-w') || 1;
+  const fh    = intVal('p-h') || 1;
+  const scale = floatVal('p-scale') || 0.1;
+  const hbw   = intVal('p-hbw');
+  const hbh   = intVal('p-hbh');
+  const hbx   = intVal('p-hbx');
+  const hby   = intVal('p-hby');
+
+  // Re-register the preview frame on the texture
+  const tex = scene.textures.get(sheetKey);
+  if (tex.frames['__prev']) {
+    delete tex.frames['__prev'];
+    tex.frameTotal = Math.max(0, tex.frameTotal - 1);
+  }
+  tex.add('__prev', 0, fx, fy, fw, fh);
+
+  previewImg.setTexture(sheetKey, '__prev');
+  previewImg.setScale(scale);
+  previewImg.setPosition(260, 200);
+
+  // Frame border (blue, faint)
+  frameBorderGfx.clear();
+  frameBorderGfx.lineStyle(1, 0x388bfd, 0.5);
+  frameBorderGfx.strokeRect(
+    260 - (fw * scale) / 2,
+    200 - (fh * scale) / 2,
+    fw * scale, fh * scale
+  );
+
+  // Hitbox overlay (green)
+  hbGfx.clear();
+  if (document.getElementById('show-hitbox').checked) {
+    const sx = 260 - (fw * scale) / 2;
+    const sy = 200 - (fh * scale) / 2;
+    const rx = sx + hbx * scale;
+    const ry = sy + hby * scale;
+    const rw = hbw * scale;
+    const rh = hbh * scale;
+
+    hbGfx.lineStyle(2, 0x56d364, 1);
+    hbGfx.strokeRect(rx, ry, rw, rh);
+
+    // Corner markers
+    hbGfx.fillStyle(0x56d364, 1);
+    [[rx, ry], [rx+rw, ry], [rx, ry+rh], [rx+rw, ry+rh]].forEach(([cx, cy]) => {
+      hbGfx.fillRect(cx - 3, cy - 3, 6, 6);
+    });
+
+    // Dimension labels via DOM overlay would need a canvas — skip for clarity
+  }
+
+  // Sheet highlight
+  highlightSheet(fx, fy, fw, fh);
+}
+
+// ── Animation ──────────────────────────────────────────────────────────────
+function toggleAnimation() {
+  animTimer ? stopAnimation() : startAnimation();
+}
+
+function startAnimation() {
+  const animIdx = parseInt(document.getElementById('anim-select').value) || 0;
+  const anim    = ANIM_DEFS[currentSprite][animIdx];
+  const btn     = document.getElementById('anim-btn');
+  btn.textContent = '⏹ Stop';
+  btn.classList.add('playing');
+
+  animFrameCursor = 0;
+  const interval  = Math.round(1000 / anim.fps);
+
+  animTimer = setInterval(() => {
+    const frameIdx = anim.indices[animFrameCursor % anim.indices.length];
+    currentFrameIdx = frameIdx;
+    document.querySelectorAll('.frame-btn')
+      .forEach((b, i) => b.classList.toggle('active', i === frameIdx));
+
+    const f  = FRAME_DEFS[currentSprite][frameIdx];
+    const fw = currentSprite === 'shihtzu' ? SHIH_W : BIRD_W;
+    const fh = currentSprite === 'shihtzu' ? SHIH_H : BIRD_H;
+    setVal('p-x', f.col * fw);
+    setVal('p-y', f.row * fh);
+    setVal('p-w', fw);
+    setVal('p-h', fh);
+    document.getElementById('info-name').textContent = f.name;
+    document.getElementById('info-col').textContent  = f.col;
+    document.getElementById('info-row').textContent  = f.row;
+    renderFrame();
+    animFrameCursor++;
+  }, interval);
+}
+
+function stopAnimation() {
+  if (!animTimer) return;
+  clearInterval(animTimer);
+  animTimer = null;
+  const btn = document.getElementById('anim-btn');
+  btn.textContent = '▶ Play';
+  btn.classList.remove('playing');
+}
+
+// ── Sheet preview (HTML5 Canvas) ────────────────────────────────────────────
+const sheetCanvas = document.getElementById('sheet-canvas');
+const sheetCtx    = sheetCanvas.getContext('2d');
+let sheetImg = null;
+let hlRect   = { x:0, y:0, w:0, h:0 };
+
+function loadSheetImg(sprite) {
+  const src = sprite === 'shihtzu' ? 'assets/sprites_shihtzu.png' : 'assets/sprites_enemybird.png';
+  sheetImg = null;
+  const img = new Image();
+  img.onload = () => {
+    sheetImg = img;
+    sheetCanvas.width  = img.width;
+    sheetCanvas.height = img.height;
+    drawSheet();
+  };
+  img.src = src;
+}
+
+function highlightSheet(x, y, w, h) {
+  hlRect = { x, y, w, h };
+  drawSheet();
+}
+
+function drawSheet() {
+  if (!sheetImg) return;
+  const cw = sheetCanvas.width;
+  const ch = sheetCanvas.height;
+  sheetCtx.clearRect(0, 0, cw, ch);
+  sheetCtx.drawImage(sheetImg, 0, 0);
+
+  // Dim overlay
+  sheetCtx.fillStyle = 'rgba(13,17,23,0.62)';
+  sheetCtx.fillRect(0, 0, cw, ch);
+
+  // Grid lines (expected uniform grid based on default frame sizes)
+  const d  = DEFAULTS[currentSprite];
+  const gw = currentSprite === 'shihtzu' ? SHIH_W : BIRD_W;
+  const gh = currentSprite === 'shihtzu' ? SHIH_H : BIRD_H;
+  sheetCtx.strokeStyle = 'rgba(56,139,253,0.25)';
+  sheetCtx.lineWidth = 1;
+  for (let x = 0; x <= cw; x += gw) {
+    sheetCtx.beginPath(); sheetCtx.moveTo(x, 0); sheetCtx.lineTo(x, ch); sheetCtx.stroke();
+  }
+  for (let y = 0; y <= ch; y += gh) {
+    sheetCtx.beginPath(); sheetCtx.moveTo(0, y); sheetCtx.lineTo(cw, y); sheetCtx.stroke();
+  }
+
+  // Highlighted frame — full brightness
+  const { x, y, w, h } = hlRect;
+  if (w > 0 && h > 0) {
+    sheetCtx.drawImage(sheetImg, x, y, w, h, x, y, w, h);
+    sheetCtx.strokeStyle = '#56d364';
+    sheetCtx.lineWidth = 3;
+    sheetCtx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+  }
+}
+
+// ── Copy code ──────────────────────────────────────────────────────────────
+function copyCode() {
+  const f      = FRAME_DEFS[currentSprite][currentFrameIdx];
+  const key    = currentSprite === 'shihtzu' ? 'shihtzu_sheet' : 'bird_sheet';
+  const x      = getVal('p-x'), y  = getVal('p-y');
+  const w      = getVal('p-w'), h  = getVal('p-h');
+  const scale  = getVal('p-scale');
+  const hbw    = getVal('p-hbw'), hbh = getVal('p-hbh');
+  const hbx    = getVal('p-hbx'), hby = getVal('p-hby');
+
+  const lines = [
+    `// ${f.name}`,
+    `scene.textures.get('${key}').add('${f.name}', 0, ${x}, ${y}, ${w}, ${h});`,
+    `sprite.setScale(${scale});`,
+    `sprite.body.setSize(${hbw}, ${hbh});`,
+    `sprite.body.setOffset(${hbx}, ${hby});`,
+  ].join('\n');
+
+  const out = document.getElementById('code-out');
+  out.style.display = 'block';
+  out.textContent   = lines;
+  navigator.clipboard?.writeText(lines).catch(() => {});
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function getVal(id)    { return document.getElementById(id).value; }
+function setVal(id, v) { document.getElementById(id).value = v; }
+function intVal(id)    { return parseInt(getVal(id))   || 0; }
+function floatVal(id)  { return parseFloat(getVal(id)) || 0; }
+
+// ── Init ───────────────────────────────────────────────────────────────────
+loadSheetImg('shihtzu');
+</script>
+</body>
+</html>
