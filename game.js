@@ -203,7 +203,7 @@ function create() {
     player.setScale(0.32);
     // Tighten hit box to roughly match the visible dog (sprite has lots of transparent margin)
     player.body.setSize(150, 200);
-    player.body.setOffset((SHIH_W - 150) / 2, SHIH_H - 300);
+    player.body.setOffset((SHIH_W - 150) / 2, SHIH_H - 200);
     player.setCollideWorldBounds(true);
     player.anims.play('shihtzu-idle');
 
@@ -457,7 +457,7 @@ function spawnEnemyDog(spawnX) {
     dog.setScale(0.32);
     // Match the player's hit box footprint roughly; sprite has transparent margin.
     dog.body.setSize(150, 200);
-    dog.body.setOffset((BIRD_W - 150) / 2, BIRD_H - 240);
+    dog.body.setOffset((BIRD_W - 150) / 2, BIRD_H - 200);
     // Walks leftward, opposite direction to the protagonist; slower than birds.
     const levelBonus = (currentLevel - 1) * 12;
     const speed = Phaser.Math.Between(55 + levelBonus, 95 + levelBonus);
