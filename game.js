@@ -1,5 +1,9 @@
 // Shih Tzu City Adventure - Phaser 3 game
 // Player walks/jumps right through a city while avoiding incoming birds.
+// Wrapped in an IIFE so internal state and helpers stay out of the global scope.
+
+(function () {
+'use strict';
 
 const VIEW_W = 960;
 const VIEW_H = 540;
@@ -563,3 +567,5 @@ function hitEnemy(playerSprite, enemy) {
         centerText.setText('GAME OVER\nPress R to retry');
     }
 }
+
+})();
