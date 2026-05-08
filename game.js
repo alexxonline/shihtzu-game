@@ -9,9 +9,20 @@ const GROUND_THICKNESS = 60;
 const ROAR_RANGE = 280;     // Birds within this many pixels of the dog get knocked out by a roar
 
 // Levels — each entry is the texture key for that level's background.
-// Birds get faster on higher levels (see spawnBird).
-const LEVEL_BG_KEYS = ['city', 'level2', 'level3', 'level4'];
+// Difficulty cycles every 4 levels: levels 5-8 reuse the params of 1-4, and
+// levels 9-12 reuse them again (see `difficultyTier()` and its callers).
+const LEVEL_BG_KEYS = [
+    'city', 'level2', 'level3', 'level4',
+    'level5', 'level6', 'level7', 'level8',
+    'level9', 'level10', 'level11', 'level12'
+];
 const TOTAL_LEVELS = LEVEL_BG_KEYS.length;
+
+// Map a 1-based level number to its difficulty tier in [1, 4]. Levels 5-8 and
+// 9-12 reuse the bird speed and enemy dog count of levels 1-4 respectively.
+function difficultyTier(level) {
+    return ((level - 1) % 4) + 1;
+}
 
 // Sprite sheet frame sizes (sheets are laid out as a 6x3 grid)
 const SHIH_W = Math.floor(1590 / 6);   // 265
@@ -72,6 +83,14 @@ function preload() {
     this.load.image('level2', 'assets/background_level2.png');
     this.load.image('level3', 'assets/background_level3.png');
     this.load.image('level4', 'assets/background_level4.png');
+    this.load.image('level5', 'assets/background_level5.png');
+    this.load.image('level6', 'assets/background_level6.png');
+    this.load.image('level7', 'assets/background_level7.png');
+    this.load.image('level8', 'assets/background_level8.png');
+    this.load.image('level9', 'assets/background_level9.png');
+    this.load.image('level10', 'assets/background_level10.png');
+    this.load.image('level11', 'assets/background_level11.png');
+    this.load.image('level12', 'assets/background_level12.png');
     this.load.image('shihtzu_sheet', 'assets/sprites_shihtzu.png');
     this.load.image('bird_sheet', 'assets/sprites_enemybird.png');
     this.load.image('enemydog_sheet', 'assets/sprites_enemydog.png');
@@ -222,7 +241,7 @@ function create() {
     this.physics.add.overlap(player, enemyDogs, hitEnemy, null, this);
 
     const dogCounts = [3, 5, 7, 9];
-    const dogCount = dogCounts[currentLevel - 1] || 3;
+    const dogCount = dogCounts[difficultyTier(currentLevel) - 1];
     dogSpawnQueue = [];
     const dogStartX = 800;
     const dogEndX = WORLD_W - 350;
@@ -440,8 +459,8 @@ function spawnBird() {
     bird.body.setSize(150, 220);
     bird.body.setOffset((BIRD_W - 150) / 2, (BIRD_H - 220) / 2);
 
-    // Each level past the first adds a flat speed bonus to both ends of the range.
-    const levelBonus = (currentLevel - 1) * 55;
+    // Each tier past the first adds a flat speed bonus to both ends of the range.
+    const levelBonus = (difficultyTier(currentLevel) - 1) * 55;
     const speed = Phaser.Math.Between(170 + levelBonus, 280 + levelBonus);
     bird.setVelocityX(-speed);
     // Birds fly left toward the player; flip the sprite so they face left.
@@ -459,7 +478,7 @@ function spawnEnemyDog(spawnX) {
     dog.body.setSize(150, 200);
     dog.body.setOffset((BIRD_W - 150) / 2, BIRD_H - 200);
     // Walks leftward, opposite direction to the protagonist; slower than birds.
-    const levelBonus = (currentLevel - 1) * 12;
+    const levelBonus = (difficultyTier(currentLevel) - 1) * 12;
     const speed = Phaser.Math.Between(55 + levelBonus, 95 + levelBonus);
     dog.setVelocityX(-speed);
     dog.setFlipX(false);
