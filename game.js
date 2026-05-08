@@ -25,6 +25,10 @@ const config = {
     width: VIEW_W,
     height: VIEW_H,
     backgroundColor: '#87ceeb',
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     physics: {
         default: 'arcade',
         arcade: { gravity: { y: 1400 }, debug: false }
@@ -286,6 +290,28 @@ function create() {
 }
 
 function update(time) {
+    // Virtual gamepad bridge — `held` for continuous keys, `justPressed` for
+    // edge-triggered ones. We consume the just-pressed flags here so each tap
+    // fires exactly one action.
+    const vi = window.virtualInput || { left: false, right: false, up: false, r: false };
+    const viJust = window.virtualInputJustPressed || { up: false, r: false };
+    const virtualJump = !!viJust.up; if (viJust.up) viJust.up = false;
+    const virtualR    = !!viJust.r;  if (viJust.r)  viJust.r  = false;
+
+    // Virtual R has the same dual role as the keyboard R: roar while playing,
+    // restart on the end-of-game screens.
+    if (virtualR) {
+        if (gameState === 'playing') {
+            roar.call(this);
+        } else if (gameState === 'gameover' || gameState === 'won') {
+            currentLevel = 1;
+            carryLives = 3;
+            carryPoints = 0;
+            this.scene.restart();
+            return;
+        }
+    }
+
     if (gameState !== 'playing') return;
 
     const speed = 230;
@@ -295,8 +321,8 @@ function update(time) {
         player.setVelocityX(0);
     } else {
         // ---- Horizontal movement ----
-        const goLeft  = cursors.left.isDown  || wasd.left.isDown;
-        const goRight = cursors.right.isDown || wasd.right.isDown;
+        const goLeft  = cursors.left.isDown  || wasd.left.isDown  || vi.left;
+        const goRight = cursors.right.isDown || wasd.right.isDown || vi.right;
 
         if (goLeft && !goRight) {
             player.setVelocityX(-speed);
@@ -312,7 +338,8 @@ function update(time) {
         const jumpPressed =
             Phaser.Input.Keyboard.JustDown(cursors.up) ||
             Phaser.Input.Keyboard.JustDown(cursors.space) ||
-            Phaser.Input.Keyboard.JustDown(wasd.up);
+            Phaser.Input.Keyboard.JustDown(wasd.up) ||
+            virtualJump;
 
         if (jumpPressed && onGround) {
             player.setVelocityY(-620);
