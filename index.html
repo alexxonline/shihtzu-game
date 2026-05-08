@@ -9,6 +9,15 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Shih Tzu City Adventure</title>
+    <script>
+        // Tag the document as a touch device before stylesheets are applied so
+        // the touch styles win on first paint (no flash of desktop layout).
+        if ('ontouchstart' in window
+            || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)
+            || (navigator.msMaxTouchPoints && navigator.msMaxTouchPoints > 0)) {
+            document.documentElement.classList.add('is-touch');
+        }
+    </script>
     <style>
         html, body {
             margin: 0;
@@ -117,22 +126,24 @@
             70%, 100% { transform: rotate(90deg); }
         }
 
-        /* On touch devices: hide chrome, show virtual pad, fill screen.
-           `100dvh` (dynamic viewport) keeps the canvas sized to the *currently
-           visible* area on iOS Safari, so the game stays fully on-screen as
-           the nav bar shows/hides. */
-        @media (hover: none) and (pointer: coarse) {
-            body { justify-content: center; }
-            h1, .controls { display: none; }
-            #game {
-                box-shadow: none;
-                border-radius: 0;
-                width: 100vw;
-                height: 100vh;       /* fallback */
-                height: 100dvh;
-            }
-            #touch-pad { display: block; }
+        /* Touch-device styles. Gated on a `.is-touch` class set by JS via
+           feature detection — `(hover: none) and (pointer: coarse)` looked
+           tidy but proved unreliable on Chrome Android (varies with stylus,
+           paired peripherals, and Desktop-site mode). `100dvh` (dynamic
+           viewport) keeps the canvas sized to the *currently visible* area on
+           iOS Safari, so the game stays fully on-screen as the nav bar
+           shows/hides. */
+        html.is-touch body { justify-content: center; }
+        html.is-touch h1,
+        html.is-touch .controls { display: none; }
+        html.is-touch #game {
+            box-shadow: none;
+            border-radius: 0;
+            width: 100vw;
+            height: 100vh;       /* fallback */
+            height: 100dvh;
         }
+        html.is-touch #touch-pad { display: block; }
 
         /* Fullscreen toggle (top-right corner). Smaller than gamepad buttons. */
         #btn-fs {
@@ -156,8 +167,8 @@
         }
         #btn-fs:active { background: rgba(255, 255, 255, 0.4); opacity: 1; }
         /* Touch device held in portrait — block play, prompt rotation */
-        @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
-            #rotate-overlay { display: flex; }
+        @media (orientation: portrait) {
+            html.is-touch #rotate-overlay { display: flex; }
         }
     </style>
 </head>
