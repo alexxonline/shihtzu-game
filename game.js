@@ -11,6 +11,9 @@ const WORLD_W = 5400;
 const GROUND_Y = 470;       // Top surface of the ground physics body
 const GROUND_THICKNESS = 60;
 const ROAR_RANGE = 280;     // Birds within this many pixels of the dog get knocked out by a roar
+// Body offset Y for ground-walking characters (player + enemy dog). Aligns the body's
+// bottom edge with the visible feet in the frame instead of the bottom of the frame.
+const FEET_OFFSET_Y = 40;
 
 // Levels — each entry is the texture key for that level's background.
 // Difficulty cycles every 4 levels: levels 5-8 reuse the params of 1-4, and
@@ -224,9 +227,9 @@ function create() {
     // -------- Player --------
     player = this.physics.add.sprite(120, GROUND_Y - 80, 'shihtzu_sheet', 'idle_1');
     player.setScale(0.32);
-    // Tighten hit box to roughly match the visible dog (sprite has lots of transparent margin)
+    // Tighten hit box to roughly match the visible dog (sprite has lots of transparent margin).
     player.body.setSize(150, 200);
-    player.body.setOffset((SHIH_W - 150) / 2, SHIH_H - 200);
+    player.body.setOffset((SHIH_W - 150) / 2, FEET_OFFSET_Y);
     player.setCollideWorldBounds(true);
     player.anims.play('shihtzu-idle');
 
@@ -478,9 +481,9 @@ function spawnBird() {
 function spawnEnemyDog(spawnX) {
     const dog = enemyDogs.create(spawnX, GROUND_Y - 80, 'enemydog_sheet', 'd_walk_1');
     dog.setScale(0.32);
-    // Match the player's hit box footprint roughly; sprite has transparent margin.
+    // Match the player's hit box footprint and feet alignment.
     dog.body.setSize(150, 200);
-    dog.body.setOffset((BIRD_W - 150) / 2, BIRD_H - 200);
+    dog.body.setOffset((BIRD_W - 150) / 2, FEET_OFFSET_Y);
     // Walks leftward, opposite direction to the protagonist; slower than birds.
     const levelBonus = (difficultyTier(currentLevel) - 1) * 12;
     const speed = Phaser.Math.Between(55 + levelBonus, 95 + levelBonus);
